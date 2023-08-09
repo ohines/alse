@@ -1,4 +1,5 @@
 require(dplyr)
+require(parallel)
 
 
 alse_estimands <- function(alse_functions) {
@@ -22,14 +23,6 @@ alse_estimands <- function(alse_functions) {
     psi_d <- sum(infl_d_uncentred) / n
     std_err_d <- sqrt((sum(infl_d_uncentred^2) / n - psi_d^2) / n)
 
-    # TMLE version with Gaussian R-learner correction
-    psi_plug <- sum(lambda_r) / n
-    tmle_coefficient <- (psi_r - psi_plug) / eta
-    lambda_t <- lambda_r + tmle_coefficient / beta_inv_r
-    psi_t <- sum(lambda_t) / n
-    infl_t <- (ya_res - lambda_t * aa_res) * beta_inv_r + lambda_t - psi_t
-    std_err_t <- sqrt(sum(infl_t^2) / n / n)
-
     # summary stats for debugging
     min_r <- min(beta_inv_r)
     max_r <- max(beta_inv_r)
@@ -37,14 +30,12 @@ alse_estimands <- function(alse_functions) {
     max_d <- max(beta_inv_d)
 
     list(
-      psi = psi_1,
-      std_err_psi = std_err_1,
+      psi_0 = psi_1,
+      std_err_0 = std_err_1,
       psi_r = psi_r,
       std_err_r = std_err_r,
       psi_d = psi_d,
       std_err_d = std_err_d,
-      psi_t = psi_t,
-      std_err_t = std_err_t,
       min_r = min_r,
       max_r = max_r,
       min_d = min_d,
@@ -90,25 +81,37 @@ alse_analysis <- function(
     a,
     x,
     folds,
-    fitfunc) {
+    fitfunc,
+    parallel = FALSE) {
   alg_1 <- get_alse_functions(y, a, x, y, a, x, fitfunc)
 
-  alg_2 <- sapply(
-    unique(folds), function(fold) {
-      in_train <- folds != fold
-      in_test <- !in_train
-      get_alse_functions(
-        y[in_train],
-        a[in_train],
-        x[in_train, ],
-        y[in_test],
-        a[in_test],
-        x[in_test, ],
-        fitfunc
-      )
-    },
-    simplify = FALSE
-  ) %>% bind_rows()
+  fn <- function(fold) {
+    in_train <- folds != fold
+    in_test <- !in_train
+    get_alse_functions(
+      y[in_train],
+      a[in_train],
+      x[in_train, ],
+      y[in_test],
+      a[in_test],
+      x[in_test, ],
+      fitfunc
+    )
+  }
+  if (parallel) {
+    alg_2 <- mclapply(
+      unique(folds), fn,
+      mc.cores = getOption("mc.cores", 10)
+    ) %>% bind_rows()
+  } else {
+    alg_2 <- sapply(unique(folds), fn, simplify = FALSE) %>% bind_rows()
+  }
 
-  as.list(unlist(c(alse_estimands(alg_1), alse_estimands(alg_2))))
+  ests_1 <- alse_estimands(alg_1)
+  ests_2 <- alse_estimands(alg_2)
+
+  names(ests_1) <- paste0(names(ests_1), "_1")
+  names(ests_2) <- paste0(names(ests_2), "_2")
+
+  as.list(unlist(c(ests_1, ests_2)))
 }
