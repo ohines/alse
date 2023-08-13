@@ -1,6 +1,6 @@
-# Average least squares effects
+# Average least squares estimands
 
-This repo contains reproduction code for simulation and the applied example for the paper "Optimally weighted average derivative effects"
+This repo contains reproduction code for simulation and the applied example for the paper ["Optimally weighted average derivative effects"](https://arxiv.org/abs/2308.05456)
 by Oliver Hines, Karla Diaz-Ordaz, and Stijn Vansteelandt
 
 ## Simulation study
