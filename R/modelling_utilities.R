@@ -44,7 +44,7 @@ fitfunc_sl1 <- function(y, x, x_new, weights = NULL) {
     GAMlearners$names,
     XGBlearners$names
   )
-  sl_folds <- 2
+  sl_folds <- 20
 
   fit <- SuperLearner::SuperLearner(y, x,
     family = gaussian(),
