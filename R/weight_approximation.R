@@ -66,11 +66,12 @@ density_point <- function(
 }
 
 
-approximate_weights <- function(z, f) {
+approximate_weights <- function(z, ...) {
+  f <- density_point(z, ...)
   ord <- order(z)
-  inv_ord <- order(ord)  # inverse permutation
-  a <- z[ord]  # sorted
-  d <- f[ord]
-  w <- - cumsum(a) / length(a) / d
-  w[inv_ord]
+  inverse_premutation <- order(ord)
+  z_sorted <- z[ord]
+  f <- f[ord]
+  w <- - cumsum(z_sorted) / length(z) / f
+  w[inverse_premutation]
 }

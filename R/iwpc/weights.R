@@ -5,18 +5,20 @@ require(tidyr)
 require(glue)
 
 DATA_DIR <- "Data/"
+RESULTS_DIR <- "Output/"
+PLOT_DISCRETE <- paste0(RESULTS_DIR, "weights_plot_discrete.pdf")
+PLOT_NONDISCRETE <- paste0(RESULTS_DIR, "weights_plot_nondiscrete.pdf")
 
 get_weights_df <- function(path, cross_validated, discrete) {
   arrow::read_parquet(path) %>%
+    as_tibble() %>%
     mutate(
       inv_sd_d = sqrt(pmax(beta_inv_d, 0)),
       inv_sd_r = sqrt(pmax(beta_inv_r, 0)),
       z_d = (a - pi) * inv_sd_d,
       z_r = (a - pi) * inv_sd_r,
-      f_d = density_point(z_d),
-      f_r = density_point(z_r),
-      w_d = approximate_weights(z_d, f_d),
-      w_r = approximate_weights(z_r, f_r),
+      w_d = approximate_weights(z_d),
+      w_r = approximate_weights(z_r),
       cross_validated = cross_validated,
       discrete = discrete,
     )
@@ -44,12 +46,24 @@ get_combined_weights_df <- function(discrete) {
 get_facet_histogram <- function(df) {
   ggplot(df, aes(x = weight)) +
     geom_histogram(binwidth = 0.2) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
     facet_grid(rows = vars(cross_validated), cols = vars(method)) +
     xlim(0, 5) +
+    xlab("Weight") +
+    ylab("Count") +
     theme_bw()
 }
 
-plt1 <- get_facet_histogram(get_combined_weights_df(discrete = TRUE))
-plt2 <- get_facet_histogram(get_combined_weights_df(discrete = FALSE))
+
+pdf(file = PLOT_DISCRETE, height = 6, width = 8.5)
+plt <- get_facet_histogram(get_combined_weights_df(discrete = TRUE))
+print(plt)
+dev.off()
+
+pdf(file = PLOT_NONDISCRETE, height = 6, width = 8.5)
+plt <- get_facet_histogram(get_combined_weights_df(discrete = FALSE))
+print(plt)
+dev.off()
+
 
 arrow::read_parquet("Output/data_illustration.parquet")
