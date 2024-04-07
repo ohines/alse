@@ -82,7 +82,7 @@ df_r <- res %>%
       levels = c("0", "r", "d"),
       labels = c("Psi", "r-learner", "direct")
     ),
-    cv = ifelse(cv == "2", "2*", "1*"),
+    cv = ifelse(cv == "2", "SS", "noSS"),
   ) %>%
   left_join(true_vals) %>%
   mutate(

@@ -32,18 +32,18 @@ ests_sl <- alse_analysis(
     x,
     folds,
     fitfunc_sl1,
-    parallel = TRUE
+    save_raw_path = "nondiscrete_raw"
 )
 saveRDS(ests_sl, "Data/nondiscreteFit.rds")
 
 # Computationally intensive analysis using discrete super learner
-ests_sl2 <- ALSE_analysis(
+ests_sl2 <- alse_analysis(
     df$Y,
     df$A,
     x,
     folds,
     fitfunc_sl2,
-    parallel = TRUE
+    save_raw_path = "discrete_raw"
 )
 saveRDS(ests_sl2, "Data/discreteFit.rds")
 

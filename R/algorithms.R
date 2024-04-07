@@ -82,8 +82,12 @@ alse_analysis <- function(
     x,
     folds,
     fitfunc,
-    parallel = FALSE) {
+    parallel = FALSE,
+    save_raw_path = NULL) {
   alg_1 <- get_alse_functions(y, a, x, y, a, x, fitfunc)
+  if (is.character(save_raw_path)) {
+    arrow::write_parquet(alg_1, glue::glue("Data/{save_raw_path}_1.parquet"))
+  }
 
   fn <- function(fold) {
     in_train <- folds != fold
@@ -105,6 +109,10 @@ alse_analysis <- function(
     ) %>% bind_rows()
   } else {
     alg_2 <- sapply(unique(folds), fn, simplify = FALSE) %>% bind_rows()
+  }
+
+  if (is.character(save_raw_path)) {
+    arrow::write_parquet(alg_2, glue::glue("Data/{save_raw_path}_2.parquet"))
   }
 
   ests_1 <- alse_estimands(alg_1)
