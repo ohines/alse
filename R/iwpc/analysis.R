@@ -4,17 +4,20 @@ require(arrow)
 source("R/algorithms.R")
 source("R/modelling_utilities.R")
 
+DATA_DIR <- "Data"
+RESULTS_DIR <- "Output"
 
-clean_data_path <- "Data/iwpc_clean.parquet"
+clean_data_path <- file.path(DATA_DIR, "iwpc_clean.parquet")
 
-df <- read_parquet(clean_data_path, as_tibble = TRUE) %>%
+df <- read_parquet(clean_data_path, as_tibble = TRUE) |>
     rename(A = Dose, Y = INR)
 
 x <- select(df, -Y, -A)
 
 # Basic parametric analysis
 mod <- glm(Y ~ ., data = df, family = gaussian())
-summary(mod)
+print("Comparison results from basic parametric analysis:")
+summary(mod) |> print()
 
 # Randomly allocate folds
 set.seed(123456)
@@ -34,7 +37,7 @@ ests_sl <- alse_analysis(
     fitfunc_sl1,
     save_raw_path = "nondiscrete_raw"
 )
-saveRDS(ests_sl, "Data/nondiscreteFit.rds")
+saveRDS(ests_sl, file.path(DATA_DIR, "nondiscreteFit.rds"))
 
 # Computationally intensive analysis using discrete super learner
 ests_sl2 <- alse_analysis(
@@ -45,29 +48,34 @@ ests_sl2 <- alse_analysis(
     fitfunc_sl2,
     save_raw_path = "discrete_raw"
 )
-saveRDS(ests_sl2, "Data/discreteFit.rds")
+saveRDS(ests_sl2, file.path(DATA_DIR, "discreteFit.rds"))
 
 # collate results
 results <- list(
     c(ests_glm, list(learner = "glm")),
     c(ests_sl, list(learner = "sl_non_discrete")),
     c(ests_sl2, list(learner = "sl_discrete"))
-) %>%
+) |>
     map(function(x) {
         df <- as.data.frame(x)
         colnames(df) <- names(x)
         df
-    }) %>%
-    bind_rows() %>%
+    }) |>
+    bind_rows() |>
     as_tibble()
 
-df_r <- results %>%
+df_r <- results |>
     pivot_longer(
-        cols = c(starts_with("psi"), starts_with("max"), starts_with("min"), starts_with("std_err")),
+        cols = c(
+            starts_with("psi"),
+            starts_with("max"),
+            starts_with("min"),
+            starts_with("std_err")
+        ),
         names_to = c(".value", "method", "cv"),
         names_pattern = "(.{3,7})_(.{1})_(.{1})$"
-    ) %>%
-    rename(estimate = psi) %>%
+    ) |>
+    rename(estimate = psi) |>
     mutate(
         estimand = ifelse(method == "0", "Psi", "psi"),
         method = factor(
@@ -81,5 +89,9 @@ df_r <- results %>%
         pval = pchisq(t_stat^2, df = 1, lower.tail = FALSE),
     )
 
+print("Results from Alse analysis:")
+print(df_r)
+
 # save results
-write_parquet(df_r, "Output/data_illustration.parquet")
+save_path <- file.path(RESULTS_DIR, "data_illustration.parquet")
+arrow::write_parquet(df_r, save_path)

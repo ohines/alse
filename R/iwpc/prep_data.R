@@ -10,11 +10,15 @@ require(dplyr)
 # For data licence see https://www.pharmgkb.org/page/dataUsagePolicy
 iwpc_url <- "https://api.pharmgkb.org/v1/download/submission/553247439"
 
-data_directory <- "Data/"
-raw_data_path <- paste0(data_directory, "iwpc_raw.xls")
-output_path <- paste0(data_directory, "iwpc_clean.parquet")
+DATA_DIR <- "Data"
+RESULTS_DIR <- "Output"
 
-download.file(iwpc_url, raw_data_path)
+raw_data_path <- file.path(DATA_DIR, "iwpc_raw.xls")
+output_path <- file.path(DATA_DIR, "iwpc_clean.parquet")
+
+if (!file.exists(raw_data_path)) {
+    download.file(iwpc_url, raw_data_path)
+}
 
 col_types <- rep("guess", times = 68)
 col_types[37] <- "text"
@@ -48,26 +52,60 @@ dose_filtered <- filter(
 dose_tmp3 <- dose_filtered
 index9 <- which(is.na(dose_tmp3$VKORC1..1639.consensus))
 
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.1173.consensus == "C/C"), index9)] <- "G/G"
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.1173.consensus == "T/T"), index9)] <- "A/A"
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.1173.consensus == "C/T"), index9)] <- "A/G"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.1173.consensus == "C/C"),
+    index9
+)] <- "G/G"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.1173.consensus == "T/T"),
+    index9
+)] <- "A/A"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.1173.consensus == "C/T"),
+    index9
+)] <- "A/G"
 
-index9 <- intersect(which(is.na(dose_tmp3$VKORC1..1639.consensus)), which(dose_tmp3$Race..OMB. == "White"))
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.1542.consensus == "G/G"), index9)] <- "G/G"
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.1542.consensus == "C/C"), index9)] <- "A/A"
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.1542.consensus == "C/G"), index9)] <- "A/G"
+index9 <- intersect(
+    which(is.na(dose_tmp3$VKORC1..1639.consensus)),
+    which(dose_tmp3$Race..OMB. == "White")
+)
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.1542.consensus == "G/G"),
+    index9
+)] <- "G/G"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.1542.consensus == "C/C"),
+    index9
+)] <- "A/A"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.1542.consensus == "C/G"),
+    index9
+)] <- "A/G"
 
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.2255.consensus == "C/C"), index9)] <- "G/G"
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.2255.consensus == "T/T"), index9)] <- "A/A"
-dose_tmp3$VKORC1..1639.consensus[intersect(which(dose_tmp3$VKORC1.2255.consensus == "C/T"), index9)] <- "A/G"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.2255.consensus == "C/C"),
+    index9
+)] <- "G/G"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.2255.consensus == "T/T"),
+    index9
+)] <- "A/A"
+dose_tmp3$VKORC1..1639.consensus[intersect(
+    which(dose_tmp3$VKORC1.2255.consensus == "C/T"),
+    index9
+)] <- "A/G"
 
-dose_tmp4 <- dose_tmp3 %>%
-    filter(!is.na(VKORC1..1639.consensus)) %>%
+dose_tmp4 <- dose_tmp3 |>
+    filter(!is.na(VKORC1..1639.consensus)) |>
     mutate(
         Enzyme = case_when(
             ## one type is taken then enzyme is one, none of taken is zero, otherwise missing.
-            (Rifampin.or.Rifampicin == 1) | (Carbamazepine..Tegretol. == 1) | (Phenytoin..Dilantin. == 1) ~ 1,
-            (Rifampin.or.Rifampicin == 0) & (Carbamazepine..Tegretol. == 0) & (Phenytoin..Dilantin. == 0) ~ 0,
+            (Rifampin.or.Rifampicin == 1) |
+                (Carbamazepine..Tegretol. == 1) |
+                (Phenytoin..Dilantin. == 1) ~ 1,
+            (Rifampin.or.Rifampicin == 0) &
+                (Carbamazepine..Tegretol. == 0) &
+                (Phenytoin..Dilantin. == 0) ~ 0,
             .default = NA
         )
     )
@@ -89,7 +127,7 @@ df <- filter(
 )
 # DW removed filter for Dose >= 6 as 5.81 is reported in ODTR comparison papers
 
-### Final dataset construction
+# ### Final dataset construction
 traindata <- dplyr::tibble(
     Age = as.numeric(as.factor(df$Age)) - 1,
     Weight = df$Weight..kg.,
@@ -111,3 +149,17 @@ traindata <- dplyr::tibble(
 )
 
 arrow::write_parquet(traindata, output_path)
+
+# Plot to illustrate overlap issues in the data
+plt <- dplyr::tibble(
+    Dose = df$Therapeutic.Dose.of.Warfarin,
+    VKORC1 = df$VKORC1..1639.consensus
+) |>
+    ggplot(aes(x = Dose)) +
+    geom_histogram(binwidth = 10, fill = "steelblue", color = "black") +
+    facet_wrap(~VKORC1) +
+    labs(x = "Dose (mg/week)", y = "Counts") +
+    theme_minimal()
+
+save_path <- file.path(RESULTS_DIR, "iwpc_dose_by_vkorc1.pdf")
+ggsave(save_path, width = 10, height = 6)
