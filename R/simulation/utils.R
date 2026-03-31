@@ -68,9 +68,10 @@ run_simulation <- function(
     results_directory = "",
     mc_cores = 10,
     append = TRUE,
-    ...) {
-    log_file_path <- glue("{results_directory}{sim_name}.log")
-    data_file_path <- glue("{results_directory}{sim_name}.parquet")
+    ...
+) {
+    log_file_path <- file.path(results_directory, glue("{sim_name}.log"))
+    data_file_path <- file.path(results_directory, glue("{sim_name}.parquet"))
     log_file <- file(log_file_path, "a")
     on.exit(close(log_file))
 
@@ -85,41 +86,53 @@ run_simulation <- function(
     }
 
     start_time <- Sys.time()
-    log_to_file(glue(
-        "Beginning simulation '{sim_name}' with {mc_cores} cores."
-    ), log_file)
-    log_to_file(glue(
-        "Simulation size: {n_datasets} datasets for {length(sample_sizes)} sample size(s)."
-    ), log_file)
+    log_to_file(
+        glue("Beginning simulation '{sim_name}' with {mc_cores} cores."),
+        log_file
+    )
+    log_to_file(
+        glue(
+            "Simulation size: {n_datasets} datasets for {length(sample_sizes)} sample size(s)."
+        ),
+        log_file
+    )
 
-    # run simulation in parallel.
-    results <- parallel::mclapply(
-        rep(sample_sizes, times = n_datasets),
-        function(n) {
-            df <- generate_data(n = n)
-            (get_estimates(df, ...))
-        },
-        mc.cores = mc_cores
-    ) %>% simplify2tibble(estimate_names)
+    run_once <- function(n) {
+        df <- generate_data(n = n)
+        get_estimates(df, ...)
+    }
+
+    # Use normal lapply for debugging
+    if (mc_cores > 0) {
+        # run simulation in parallel
+        lapply_func <- function(...) {
+            parallel::mclapply(..., mc.cores = mc_cores)
+        }
+    } else {
+        lapply_func <- lapply
+    }
+
+    # run simulations
+    results <- rep(sample_sizes, times = n_datasets) |>
+        lapply_func(run_once) |>
+        simplify2tibble(estimate_names)
 
     end_time <- Sys.time()
     sim_time <- round(difftime(end_time, start_time, units = "secs"), 2)
 
-    log_to_file(glue(
-        "Finished simulation in {sim_time} seconds."
-    ), log_file)
+    log_to_file(glue("Finished simulation in {sim_time} seconds."), log_file)
 
-    log_to_file(glue(
-        "Writing simulation results to '{data_file_path}'"
-    ), log_file)
+    log_to_file(
+        glue("Writing simulation results to '{data_file_path}'"),
+        log_file
+    )
     if (file.exists(data_file_path) && append) {
         existing_results <- arrow::read_parquet(data_file_path)
         results <- bind_rows(existing_results, results)
     }
     arrow::write_parquet(results, data_file_path)
-    (results)
+    results
 }
-
 
 ## Example ##
 #
